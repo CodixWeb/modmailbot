@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const moment = require("moment");
 const Eris = require("eris");
 const utils = require("../utils");
@@ -151,13 +155,14 @@ module.exports = ({ bot, knex, config, commands }) => {
         }
 
         const closeAt = moment.utc().add(delay, "ms");
+        const closeAtTime = `<t:${closeAt.unix()}:f>`
         await thread.scheduleClose(closeAt.format("YYYY-MM-DD HH:mm:ss"), msg.author, silentClose ? 1 : 0);
 
         let response;
         if (silentClose) {
-          response = `Thread is now scheduled to be closed silently in ${utils.humanizeDelay(delay)}. Use \`${config.prefix}close cancel\` to cancel.`;
+          response = `Thread is now scheduled to be closed silently in ${utils.humanizeDelay(delay)} (${closeAtTime}). Use \`${config.prefix}close cancel\` to cancel.`;
         } else {
-          response = `Thread is now scheduled to be closed in ${utils.humanizeDelay(delay)}. Use \`${config.prefix}close cancel\` to cancel.`;
+          response = `Thread is now scheduled to be closed in ${utils.humanizeDelay(delay)} (${closeAtTime}). Use \`${config.prefix}close cancel\` to cancel.`;
         }
 
         thread.postSystemMessage(response);
