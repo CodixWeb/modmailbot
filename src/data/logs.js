@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const Thread = require("./Thread");
 const ThreadMessage = require("./ThreadMessage");
 const utils = require("../utils");
