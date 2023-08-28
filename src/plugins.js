@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const attachments = require("./data/attachments");
 const logs = require("./data/logs");
 const { beforeNewThread } = require("./hooks/beforeNewThread");

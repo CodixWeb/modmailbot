@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const Eris = require("eris");
 const config = require("./cfg");
 
