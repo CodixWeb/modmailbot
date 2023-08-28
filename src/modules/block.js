@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const humanizeDuration = require("humanize-duration");
 const moment = require("moment");
 const blocked = require("../data/blocked");
@@ -53,14 +57,16 @@ module.exports = ({ bot, knex, config, commands }) => {
 
     if (expiresAt) {
       const humanized = humanizeDuration(args.blockTime, { largest: 2, round: true });
-      msg.channel.createMessage(`Blocked <@${userIdToBlock}> (id \`${userIdToBlock}\`) from modmail for ${humanized}`);
+      const unixTimestampSeconds = moment.utc(expiresAt).format("X")
+
+      msg.channel.createMessage(`Blocked <@${userIdToBlock}> (id \`${userIdToBlock}\`) from modmail for ${humanized} (<t:${unixTimestampSeconds}:f>)`);
 
       const timedBlockMessage = config.timedBlockMessage || config.blockMessage;
       if (timedBlockMessage) {
         const dmChannel = await user.getDMChannel();
         const formatted = timedBlockMessage
           .replace(/\{duration}/g, humanized)
-          .replace(/\{timestamp}/g, moment.utc(expiresAt).format("X"));
+          .replace(/\{timestamp}/g, unixTimestampSeconds);
         dmChannel.createMessage(formatted).catch(utils.noop);
       }
     } else {
