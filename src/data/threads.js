@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 const {User, Member, Message} = require("eris");
 
 const transliterate = require("transliteration");
@@ -73,7 +77,8 @@ async function findOpenThreadByUserId(userId) {
 function getHeaderGuildInfo(member) {
   return {
     nickname: member.nick || member.user.username,
-    joinDate: humanizeDuration(Date.now() - member.joinedAt, {largest: 2, round: true})
+    humanizedJoinDate: humanizeDuration(Date.now() - member.joinedAt, {largest: 2, round: true}),
+    joinDate: Math.floor(member.joinedAt / 1000)
   };
 }
 
@@ -263,59 +268,66 @@ async function createNewThreadForUser(user, opts = {}) {
     const infoHeaderItems = [];
 
     // Account age
-    const accountAge = humanizeDuration(Date.now() - user.createdAt, {largest: 2, round: true});
-    infoHeaderItems.push(`ACCOUNT AGE **${accountAge}**`);
+    const humanizedAccountAge = humanizeDuration(Date.now() - user.createdAt, {largest: 2, round: true});
+    const accountAge = Math.floor(user.createdAt / 1000);
+    infoHeaderItems.push(`**Account Created:** ${humanizedAccountAge} ago (<t:${accountAge}:f>)`);
 
     // User id (and mention, if enabled)
     if (config.mentionUserInThreadHeader) {
-      infoHeaderItems.push(`ID **${user.id}** (<@!${user.id}>)`);
+      infoHeaderItems.push(`**ID:** ${user.id} (<@!${user.id}>)`);
     } else {
-      infoHeaderItems.push(`ID **${user.id}**`);
+      infoHeaderItems.push(`**ID:** ${user.id}`);
     }
 
     let infoHeader = infoHeaderItems.join(", ");
 
     // Guild member info
     for (const [guildId, guildData] of userGuildData.entries()) {
-      const {nickname, joinDate} = getHeaderGuildInfo(guildData.member);
-      const headerItems = [
-        `NICKNAME **${utils.escapeMarkdown(nickname)}**`,
-        `JOINED **${joinDate}** ago`
-      ];
+      const {nickname, humanizedJoinDate, joinDate} = getHeaderGuildInfo(guildData.member);
+
+      infoHeaderItems.push(`**Nickname:** ${utils.escapeMarkdown(nickname)}`)
+      infoHeaderItems.push(`**Joined:** ${humanizedJoinDate} ago (<t:${joinDate}:f>)`)
+
+      // const headerItems = [
+      //   `NICKNAME **${utils.escapeMarkdown(nickname)}**`,
+      //   `JOINED **${joinDate}** ago`,
+      // ];
 
       if (guildData.member.voiceState.channelID) {
         const voiceChannel = guildData.guild.channels.get(guildData.member.voiceState.channelID);
         if (voiceChannel) {
-          headerItems.push(`VOICE CHANNEL **${utils.escapeMarkdown(voiceChannel.name)}**`);
+          infoHeaderItems.push(`**Voice Channel:** ${utils.escapeMarkdown(voiceChannel.name)}`);
         }
       }
 
       if (config.rolesInThreadHeader && guildData.member.roles.length) {
         const roles = guildData.member.roles.map(roleId => guildData.guild.roles.get(roleId)).filter(Boolean);
-        headerItems.push(`ROLES **${roles.map(r => r.name).join(", ")}**`);
+        infoHeaderItems.push(`**Roles:** ${roles.map(r => `<@&${r.id}>`).join(", ")}`);
       }
 
-      const headerStr = headerItems.join(", ");
+      //const headerStr = headerItems.join(", ");
 
-      if (mainGuilds.length === 1) {
-        infoHeader += `\n${headerStr}`;
-      } else {
-        infoHeader += `\n**[${utils.escapeMarkdown(guildData.guild.name)}]** ${headerStr}`;
-      }
+      // if (mainGuilds.length === 1) {
+      //   infoHeader += `\n${headerStr}`;
+      // } else {
+      //   infoHeader += `\n**[${utils.escapeMarkdown(guildData.guild.name)}]** ${headerStr}`;
+      // }
     }
 
     // Modmail history / previous logs
     const userLogCount = await getClosedThreadCountByUserId(user.id);
     if (userLogCount > 0) {
-      infoHeader += `\n\nThis user has **${userLogCount}** previous modmail threads. Use \`${config.prefix}logs\` to see them.`;
+      infoHeaderItems.push(`\nThis user has **${userLogCount}** previous modmail threads. Use \`${config.prefix}logs\` to see them.`);
     }
 
     const userNotes = await findNotesByUserId(user.id);
     if (userNotes.length) {
-      infoHeader += `\n\nThis user has **${userNotes.length}** notes. Use \`${config.prefix}notes\` to see them.`;
+      infoHeaderItems.push(`\nThis user has **${userNotes.length}** notes. Use \`${config.prefix}notes\` to see them.`);
     }
 
-    infoHeader += "\n────────────────";
+    infoHeaderItems.push("────────────────");
+
+    infoHeader = infoHeaderItems.join("\n")
 
     const { message: threadHeaderMessage } = await newThread.postSystemMessage(infoHeader, {
       allowedMentions: config.mentionUserInThreadHeader ? { users: [user.id] } : undefined,
@@ -328,7 +340,7 @@ async function createNewThreadForUser(user, opts = {}) {
     if (config.updateNotifications) {
       const availableUpdate = await updates.getAvailableUpdate();
       if (availableUpdate) {
-        await newThread.postNonLogMessage(`📣 New bot version available (${availableUpdate})`);
+        await newThread.postNonLogMessage(`📣 Nouvelle version du bot disponible (${availableUpdate})`);
       }
     }
 
