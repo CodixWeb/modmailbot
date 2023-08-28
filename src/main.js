@@ -379,6 +379,7 @@ function getBasePlugins() {
     "file:./src/modules/roles",
     "file:./src/modules/notes",
     "file:./src/modules/ping",
+    "file:./src/modules/stats",
   ];
 }
 

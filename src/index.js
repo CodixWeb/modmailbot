@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2023
+ *   All rights reserved.
+ */
 // Verify NodeJS version
 const nodeMajorVersion = parseInt(process.versions.node.split(".")[0], 10);
 if (nodeMajorVersion < 12) {
