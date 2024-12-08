@@ -1,7 +1,3 @@
-/*
- *   Copyright (c) 2023
- *   All rights reserved.
- */
 const {User, Member, Message} = require("eris");
 
 const transliterate = require("transliteration");
@@ -19,7 +15,7 @@ const updates = require("./updates");
 const Thread = require("./Thread");
 const ThreadMessage = require("./ThreadMessage");
 const {callBeforeNewThreadHooks} = require("../hooks/beforeNewThread");
-const {THREAD_STATUS, DISOCRD_CHANNEL_TYPES} = require("./constants");
+const {THREAD_STATUS, DISCORD_CHANNEL_TYPES} = require("./constants");
 const {findNotesByUserId} = require("./notes");
 
 const MINUTES = 60 * 1000;
@@ -76,9 +72,8 @@ async function findOpenThreadByUserId(userId) {
 
 function getHeaderGuildInfo(member) {
   return {
-    nickname: member.nick || member.user.username,
-    humanizedJoinDate: humanizeDuration(Date.now() - member.joinedAt, {largest: 2, round: true}),
-    joinDate: Math.floor(member.joinedAt / 1000)
+    nickname: member.nick || config.useDisplaynames ? member.user.globalName || member.user.username : member.user.username,
+    joinDate: humanizeDuration(Date.now() - member.joinedAt, {largest: 2, round: true})
   };
 }
 
@@ -163,13 +158,12 @@ async function createNewThreadForUser(user, opts = {}) {
       }
     }
 
-    // Use the user's name+discrim for the thread channel's name
+    // Use the user's name for the thread channel's name
     // Channel names are particularly picky about what characters they allow, so we gotta do some clean-up
     let cleanName = transliterate.slugify(user.username);
     if (cleanName === "") cleanName = "unknown";
-    cleanName = cleanName.slice(0, 95); // Make sure the discrim fits
 
-    let channelName = `${cleanName}-${user.discriminator}`;
+    let channelName = cleanName;
 
     if (config.anonymizeChannelName) {
       channelName = crypto.createHash("md5").update(channelName + Date.now()).digest("hex").slice(0, 12);
@@ -211,7 +205,7 @@ async function createNewThreadForUser(user, opts = {}) {
     // Attempt to create the inbox channel for this thread
     let createdChannel;
     try {
-      createdChannel = await utils.getInboxGuild().createChannel(opts.channelName, DISOCRD_CHANNEL_TYPES.GUILD_TEXT, {
+      createdChannel = await utils.getInboxGuild().createChannel(opts.channelName, DISCORD_CHANNEL_TYPES.GUILD_TEXT, {
         reason: "New Modmail thread",
         parentID: newThreadCategoryId,
       });
@@ -220,7 +214,7 @@ async function createNewThreadForUser(user, opts = {}) {
       if (err.message.includes("Contains words not allowed for servers in Server Discovery")) {
         const replacedChannelName = "badname-0000";
         try {
-          createdChannel = await utils.getInboxGuild().createChannel(replacedChannelName, DISOCRD_CHANNEL_TYPES.GUILD_TEXT, {
+          createdChannel = await utils.getInboxGuild().createChannel(replacedChannelName, DISCORD_CHANNEL_TYPES.GUILD_TEXT, {
             reason: "New Modmail thread",
             parentID: newThreadCategoryId,
           });
@@ -238,7 +232,7 @@ async function createNewThreadForUser(user, opts = {}) {
     const newThreadId = await createThreadInDB({
       status: THREAD_STATUS.OPEN,
       user_id: user.id,
-      user_name: `${user.username}#${user.discriminator}`,
+      user_name: user.username,
       channel_id: createdChannel.id,
       next_message_number: 1,
       created_at: moment.utc().format("YYYY-MM-DD HH:mm:ss")
@@ -268,66 +262,59 @@ async function createNewThreadForUser(user, opts = {}) {
     const infoHeaderItems = [];
 
     // Account age
-    const humanizedAccountAge = humanizeDuration(Date.now() - user.createdAt, {largest: 2, round: true});
-    const accountAge = Math.floor(user.createdAt / 1000);
-    infoHeaderItems.push(`**Account Created:** ${humanizedAccountAge} ago (<t:${accountAge}:f>)`);
+    const accountAge = humanizeDuration(Date.now() - user.createdAt, {largest: 2, round: true});
+    infoHeaderItems.push(`ACCOUNT AGE **${accountAge}**`);
 
     // User id (and mention, if enabled)
     if (config.mentionUserInThreadHeader) {
-      infoHeaderItems.push(`**ID:** ${user.id} (<@!${user.id}>)`);
+      infoHeaderItems.push(`ID **${user.id}** (<@!${user.id}>)`);
     } else {
-      infoHeaderItems.push(`**ID:** ${user.id}`);
+      infoHeaderItems.push(`ID **${user.id}**`);
     }
 
     let infoHeader = infoHeaderItems.join(", ");
 
     // Guild member info
     for (const [guildId, guildData] of userGuildData.entries()) {
-      const {nickname, humanizedJoinDate, joinDate} = getHeaderGuildInfo(guildData.member);
-
-      infoHeaderItems.push(`**Nickname:** ${utils.escapeMarkdown(nickname)}`)
-      infoHeaderItems.push(`**Joined:** ${humanizedJoinDate} ago (<t:${joinDate}:f>)`)
-
-      // const headerItems = [
-      //   `NICKNAME **${utils.escapeMarkdown(nickname)}**`,
-      //   `JOINED **${joinDate}** ago`,
-      // ];
+      const {nickname, joinDate} = getHeaderGuildInfo(guildData.member);
+      const headerItems = [
+        `NICKNAME **${utils.escapeMarkdown(nickname)}**`,
+        `JOINED **${joinDate}** ago`
+      ];
 
       if (guildData.member.voiceState.channelID) {
         const voiceChannel = guildData.guild.channels.get(guildData.member.voiceState.channelID);
         if (voiceChannel) {
-          infoHeaderItems.push(`**Voice Channel:** ${utils.escapeMarkdown(voiceChannel.name)}`);
+          headerItems.push(`VOICE CHANNEL **${utils.escapeMarkdown(voiceChannel.name)}**`);
         }
       }
 
       if (config.rolesInThreadHeader && guildData.member.roles.length) {
         const roles = guildData.member.roles.map(roleId => guildData.guild.roles.get(roleId)).filter(Boolean);
-        infoHeaderItems.push(`**Roles:** ${roles.map(r => `<@&${r.id}>`).join(", ")}`);
+        headerItems.push(`ROLES **${roles.map(r => r.name).join(", ")}**`);
       }
 
-      //const headerStr = headerItems.join(", ");
+      const headerStr = headerItems.join(", ");
 
-      // if (mainGuilds.length === 1) {
-      //   infoHeader += `\n${headerStr}`;
-      // } else {
-      //   infoHeader += `\n**[${utils.escapeMarkdown(guildData.guild.name)}]** ${headerStr}`;
-      // }
+      if (mainGuilds.length === 1) {
+        infoHeader += `\n${headerStr}`;
+      } else {
+        infoHeader += `\n**[${utils.escapeMarkdown(guildData.guild.name)}]** ${headerStr}`;
+      }
     }
 
     // Modmail history / previous logs
     const userLogCount = await getClosedThreadCountByUserId(user.id);
     if (userLogCount > 0) {
-      infoHeaderItems.push(`\nThis user has **${userLogCount}** previous modmail threads. Use \`${config.prefix}logs\` to see them.`);
+      infoHeader += `\n\nThis user has **${userLogCount}** previous modmail threads. Use \`${config.prefix}logs\` to see them.`;
     }
 
     const userNotes = await findNotesByUserId(user.id);
     if (userNotes.length) {
-      infoHeaderItems.push(`\nThis user has **${userNotes.length}** notes. Use \`${config.prefix}notes\` to see them.`);
+      infoHeader += `\n\nThis user has **${userNotes.length}** notes. Use \`${config.prefix}notes\` to see them.`;
     }
 
-    infoHeaderItems.push("────────────────");
-
-    infoHeader = infoHeaderItems.join("\n")
+    infoHeader += "\n────────────────";
 
     const { message: threadHeaderMessage } = await newThread.postSystemMessage(infoHeader, {
       allowedMentions: config.mentionUserInThreadHeader ? { users: [user.id] } : undefined,
@@ -340,7 +327,7 @@ async function createNewThreadForUser(user, opts = {}) {
     if (config.updateNotifications) {
       const availableUpdate = await updates.getAvailableUpdate();
       if (availableUpdate) {
-        await newThread.postNonLogMessage(`📣 Nouvelle version du bot disponible (${availableUpdate})`);
+        await newThread.postNonLogMessage(`📣 New bot version available (${availableUpdate})`);
       }
     }
 

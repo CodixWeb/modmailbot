@@ -105,7 +105,7 @@ const bot = require("./bot");
  */
 const defaultFormatters = {
   formatStaffReplyDM(threadMessage) {
-    const roleName = threadMessage.role_name || config.fallbackRoleName;
+    const roleName = config.overrideRoleNameDisplay || threadMessage.role_name || config.fallbackRoleName;
     const modInfo = threadMessage.is_anonymous
       ? roleName
       : (roleName ? `(${roleName}) ${threadMessage.user_name}` : threadMessage.user_name);
@@ -116,7 +116,7 @@ const defaultFormatters = {
   },
 
   formatStaffReplyThreadMessage(threadMessage) {
-    const roleName = threadMessage.role_name || config.fallbackRoleName;
+    const roleName = config.overrideRoleNameDisplay || threadMessage.role_name || config.fallbackRoleName;
     const modInfo = threadMessage.is_anonymous
       ? (roleName ? `(Anonymous) (${threadMessage.user_name}) ${roleName}` : `(Anonymous) (${threadMessage.user_name})`)
       : (roleName ? `(${roleName}) ${threadMessage.user_name}` : threadMessage.user_name);

@@ -1,7 +1,3 @@
-/*
- *   Copyright (c) 2023
- *   All rights reserved.
- */
 const moment = require("moment");
 const Eris = require("eris");
 
@@ -126,6 +122,9 @@ class Thread {
       if (e.code === 10003) {
         console.log(`[INFO] Failed to send message to thread channel for ${this.user_name} because the channel no longer exists. Auto-closing the thread.`);
         this.close(true);
+      } else if (e.code === 240000) {
+        console.log(`[INFO] Failed to send message to thread channel for ${this.user_name} because the message contains a link blocked by the harmful links filter`);
+        await bot.createMessage(this.channel_id, "Failed to send message to thread channel because the message contains a link blocked by the harmful links filter");
       } else {
         throw e;
       }
@@ -225,7 +224,8 @@ class Thread {
    * @returns {Promise<boolean>} Whether we were able to send the reply
    */
   async replyToUser(moderator, text, replyAttachments = [], isAnonymous = false, messageReference = null) {
-    let moderatorName = config.useNicknames && moderator.nick ? moderator.nick : moderator.user.username;
+    const regularName = config.useDisplaynames ? moderator.user.globalName || moderator.user.username : moderator.user.username;
+    let moderatorName = config.useNicknames && moderator.nick ? moderator.nick : regularName;
     if (config.breakFormattingForNames) {
       moderatorName = moderatorName.replace(escapeFormattingRegex, "\\$&");
     }
@@ -386,7 +386,6 @@ class Thread {
     });
     if (hookResult.cancelled) return;
 
-    const fullUserName = `${msg.author.username}#${msg.author.discriminator}`;
     let messageContent = msg.content || "";
 
     // Prepare attachments
@@ -461,7 +460,7 @@ class Thread {
     let threadMessage = new ThreadMessage({
       message_type: THREAD_MESSAGE_TYPE.FROM_USER,
       user_id: this.user_id,
-      user_name: fullUserName,
+      user_name: config.useDisplaynames ? msg.author.globalName || msg.author.username : msg.author.username,
       body: messageContent,
       is_anonymous: 0,
       dm_message_id: msg.id,
@@ -634,7 +633,7 @@ class Thread {
     return this._addThreadMessageToDB({
       message_type: THREAD_MESSAGE_TYPE.CHAT,
       user_id: msg.author.id,
-      user_name: `${msg.author.username}#${msg.author.discriminator}`,
+      user_name: config.useDisplaynames ? msg.author.globalName || msg.author.username : msg.author.username,
       body: msg.content,
       is_anonymous: 0,
       dm_message_id: msg.id
@@ -645,7 +644,7 @@ class Thread {
     return this._addThreadMessageToDB({
       message_type: THREAD_MESSAGE_TYPE.COMMAND,
       user_id: msg.author.id,
-      user_name: `${msg.author.username}#${msg.author.discriminator}`,
+      user_name: config.useDisplaynames ? msg.author.globalName || msg.author.username : msg.author.username,
       body: msg.content,
       is_anonymous: 0,
       dm_message_id: msg.id
@@ -789,7 +788,7 @@ class Thread {
       .update({
         scheduled_close_at: time,
         scheduled_close_id: user.id,
-        scheduled_close_name: user.username,
+        scheduled_close_name: config.useDisplaynames ? user.globalName || user.username : user.username,
         scheduled_close_silent: silent
       });
 
@@ -848,7 +847,7 @@ class Thread {
       .update({
         scheduled_suspend_at: time,
         scheduled_suspend_id: user.id,
-        scheduled_suspend_name: user.username
+        scheduled_suspend_name: config.useDisplaynames ? user.globalName || user.username : user.username,
       });
   }
 

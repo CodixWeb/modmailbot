@@ -53,20 +53,18 @@ module.exports = ({ bot, knex, config, commands }) => {
       : null;
 
     const user = bot.users.get(userIdToBlock);
-    await blocked.block(userIdToBlock, (user ? `${user.username}#${user.discriminator}` : ""), msg.author.id, expiresAt);
+    await blocked.block(userIdToBlock, (user ? user.username : ""), msg.author.id, expiresAt);
 
     if (expiresAt) {
       const humanized = humanizeDuration(args.blockTime, { largest: 2, round: true });
-      const unixTimestampSeconds = moment.utc(expiresAt).format("X")
-
-      msg.channel.createMessage(`Blocked <@${userIdToBlock}> (id \`${userIdToBlock}\`) from modmail for ${humanized} (<t:${unixTimestampSeconds}:f>)`);
+      msg.channel.createMessage(`Blocked <@${userIdToBlock}> (id \`${userIdToBlock}\`) from modmail for ${humanized}`);
 
       const timedBlockMessage = config.timedBlockMessage || config.blockMessage;
       if (timedBlockMessage) {
         const dmChannel = await user.getDMChannel();
         const formatted = timedBlockMessage
           .replace(/\{duration}/g, humanized)
-          .replace(/\{timestamp}/g, unixTimestampSeconds);
+          .replace(/\{timestamp}/g, moment.utc(expiresAt).format("X"));
         dmChannel.createMessage(formatted).catch(utils.noop);
       }
     } else {
@@ -147,5 +145,21 @@ module.exports = ({ bot, knex, config, commands }) => {
         allowedMentions: { users: [userIdToCheck] },
       });
     }
+  });
+
+  commands.addInboxServerCommand("blocklist", "", async (msg, args, thread) => {
+    const blockedUsers = await blocked.getBlockedUsers();
+    if (blockedUsers.length === 0) {
+      msg.channel.createMessage("No users are currently blocked.");
+      return;
+    }
+
+    let reply = "List of blocked users:\n";
+    for (const user of blockedUsers) {
+      const userInfo = `**<@!${user.userId}> (id \`${user.userId}\`)** - Blocked by <@${user.blockedBy}>${user.expiresAt ? ` until ${user.expiresAt} (UTC)` : " permanently"}`;
+      reply += userInfo + "\n";
+    }
+
+    msg.channel.createMessage(reply);
   });
 };
